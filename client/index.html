@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Advanced Energy Trading</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f8f8f8;
+      padding: 20px;
+      margin: 0;
+    }
+    .container {
+      max-width: 600px;
+      margin: auto;
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+    }
+    h2 {
+      text-align: center;
+      color: #007BFF;
+    }
+    .button {
+      display: block;
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      background-color: #007BFF;
+      color: white;
+      font-size: 16px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    .button:hover {
+      background-color: #0056b3;
+    }
+    .status {
+      font-size: 14px;
+      margin-top: 10px;
+    }
+    .status.success {
+      color: green;
+    }
+    .status.error {
+      color: red;
+    }
+    .energy-amount {
+      width: 100%;
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 5px;
+      margin-bottom: 10px;
+    }
+    .input-wrapper {
+      display: flex;
+      justify-content: space-between;
+    }
+    .input-wrapper select {
+      margin-left: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Advanced Energy Trading</h2>
+    <button id="connectWallet" class="button">Connect Wallet</button>
+    <p>Connected Account: <span id="account">Not connected</span></p>
+    <div id="energyBalance">Energy Balance: Not Connected</div>
+  </div>
+
+  <div class="container">
+    <h3>Energy House</h3>
+    <div id="houseEnergyStatusHouse1">Energy House 1: 0 Watt</div>
+    <div id="houseEnergyStatusHouse2">Energy House 2: 0 Watt</div>
+  </div>
+
+  <!-- House 1 Section -->
+  <div class="container">
+    <h3>House 1 - Request Energy</h3>
+    <input type="number" id="requestAmountHouse1" class="energy-amount" placeholder="Energy Amount">
+    <button id="requestEnergyHouse1" class="button">Request Energy</button>
+    <div id="statusMessageHouse1" class="status"></div>
+
+    <h3>House 1 - Trade Energy</h3>
+    <div class="input-wrapper">
+      <input type="number" id="tradeAmountHouse1" class="energy-amount" placeholder="Energy Amount">
+      <select id="tradeToHouse1" class="energy-amount">
+        <option value="House 2">House 2</option>
+      </select>
+    </div>
+    <small style="color: #555;">Note: A trading fee of 10 Watt is required.</small>
+    <div id="feeMessageHouse1" class="status"></div>
+    <button id="tradeEnergyHouse1" class="button">Trade Energy</button>
+    <div id="statusMessageHouse1Trade" class="status"></div>
+  </div>
+
+  <!-- House 2 Section -->
+  <div class="container">
+    <h3>House 2 - Request Energy</h3>
+    <input type="number" id="requestAmountHouse2" class="energy-amount" placeholder="Energy Amount">
+    <button id="requestEnergyHouse2" class="button">Request Energy</button>
+    <div id="statusMessageHouse2" class="status"></div>
+
+    <h3>House 2 - Trade Energy</h3>
+    <div class="input-wrapper">
+      <input type="number" id="tradeAmountHouse2" class="energy-amount"placeholder="Energy Amount">
+      <select id="tradeToHouse2" class="energy-amount">
+        <option value="House 1">House 1</option>
+      </select>
+    </div>
+    <small style="color: #555;">Note: A trading fee of 10 Watt is required.</small>
+    <div id="feeMessageHouse2" class="status"></div>
+    <button id="tradeEnergyHouse2" class="button">Trade Energy</button>
+    <div id="statusMessageHouse2Trade" class="status"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/web3@1.6.1/dist/web3.min.js"></script>
+  <script>
+    let web3, account, contract;
+    let globalEnergyBalance = 2000;
+    let house1Energy = 0, house2Energy = 0;
+
+    const contractAddress = "0x2AaB96FD8193B2eCB43F57b905539601c8D2F2c1";
+    const contractABI = [
+  {
+    "inputs": [],
+    "name": "getEnergyBalance",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "requestEnergy",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "tradeEnergy",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "EnergyRequested",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "from",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "fee",
+        "type": "uint256"
+      }
+    ],
+    "name": "EnergyTraded",
+    "type": "event"
+  }
+];
+
+    async function connectWallet() {
+      if (window.ethereum) {
+        web3 = new Web3(window.ethereum);
+        try {
+          const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+          account = accounts[0];
+          document.getElementById("account").textContent = account;
+          contract = new web3.eth.Contract(contractABI, contractAddress);
+          fetchEnergyHouse();
+        } catch (err) {
+          alert("Connection failed. Please authorize in MetaMask.");
+        }
+      } else {
+        alert("MetaMask is not installed.");
+      }
+    }
+
+    function fetchEnergyHouse() {
+      document.getElementById("energyBalance").textContent = `Energy Balance: ${globalEnergyBalance} Watt`;
+      document.getElementById("houseEnergyStatusHouse1").textContent = `Energy House 1: ${house1Energy} Watt`;
+      document.getElementById("houseEnergyStatusHouse2").textContent = `Energy House 2: ${house2Energy} Watt`;
+    }
+
+    async function requestEnergy(house, amount) {
+      if (!contract || !account) return alert("Connect your wallet.");
+      if (amount <= 0) return alert("Enter a valid amount.");
+      if (globalEnergyBalance < amount) return alert("Insufficient global energy.");
+
+      try {
+        await contract.methods.requestEnergy(amount).send({ from: account });
+        globalEnergyBalance -= amount;
+        if (house === "House 1") {
+          house1Energy += amount;
+          document.getElementById('statusMessageHouse1').textContent = '✅ Energy Requested!';
+        } else {
+          house2Energy += amount;
+          document.getElementById('statusMessageHouse2').textContent = '✅ Energy Requested!';
+        }
+        fetchEnergyHouse();
+      } catch (err) {
+        console.error(err);
+        document.getElementById(`statusMessage${house.replace(' ', '')}`).textContent = '❌ Request failed.';
+      }
+    }
+
+    async function tradeEnergy(fromHouse, toHouse, amount) {
+      if (!contract || !account) return alert("Wallet not connected");
+      if (amount <= 0 || isNaN(amount)) return alert("Amount must be greater than 0");
+
+      const fee = 10;
+      const totalRequired = amount + fee;
+
+      try {
+        if (fromHouse === "House 1") {
+          if (house1Energy < totalRequired) {
+            document.getElementById('feeMessageHouse1').textContent =
+              `❌ Not enough energy. You need ${totalRequired} Watt.`;
+            document.getElementById('feeMessageHouse1').className = 'status error';
+            return;
+          }
+          house1Energy -= totalRequired;
+          house2Energy += amount;
+          document.getElementById('statusMessageHouse1Trade').textContent = '✅ Energy Traded!';
+          document.getElementById('statusMessageHouse1Trade').className = 'status success';
+          document.getElementById('feeMessageHouse1').textContent = '';
+        } else {
+          if (house2Energy < totalRequired) {
+            document.getElementById('feeMessageHouse2').textContent =
+              `❌ Not enough energy. You need ${totalRequired} Watt.`;
+            document.getElementById('feeMessageHouse2').className = 'status error';
+            return;
+          }
+          house2Energy -= totalRequired;
+          house1Energy += amount;
+          document.getElementById('statusMessageHouse2Trade').textContent = '✅ Energy Traded!';
+          document.getElementById('statusMessageHouse2Trade').className = 'status success';
+          document.getElementById('feeMessageHouse2').textContent = '';
+        }
+
+        await contract.methods.requestEnergy(1).send({ from: account });
+        fetchEnergyHouse();
+      } catch (err) {
+        console.error(err);
+        const msg = fromHouse === "House 1" ? 'statusMessageHouse1Trade' : 'statusMessageHouse2Trade';
+        document.getElementById(msg).textContent = '❌ Trade failed.';
+        document.getElementById(msg).className = 'status error';
+      }
+    }
+
+    // Event listeners
+    document.getElementById("connectWallet").addEventListener("click", connectWallet);
+
+    document.getElementById("requestEnergyHouse1").addEventListener("click", () => {
+      const amount = parseInt(document.getElementById("requestAmountHouse1").value);
+      requestEnergy("House 1", amount);
+    });
+
+    document.getElementById("requestEnergyHouse2").addEventListener("click", () => {
+      const amount = parseInt(document.getElementById("requestAmountHouse2").value);
+      requestEnergy("House 2", amount);
+    });
+
+    document.getElementById("tradeEnergyHouse1").addEventListener("click", () => {
+      const amount = parseInt(document.getElementById("tradeAmountHouse1").value);
+      tradeEnergy("House 1", "House 2", amount);
+    });
+
+    document.getElementById("tradeEnergyHouse2").addEventListener("click", () => {
+      const amount = parseInt(document.getElementById("tradeAmountHouse2").value);
+      tradeEnergy("House 2", "House 1", amount);
+    });
+
+    // Live fee update
+    document.getElementById("tradeAmountHouse1").addEventListener("input", function () {
+      const val = parseInt(this.value);
+      if (!isNaN(val) && val > 0) {
+        document.getElementById("feeMessageHouse1").textContent = `Total required = ${val + 10} Watt`;
+        document.getElementById("feeMessageHouse1").className = 'status success';
+      } else {
+        document.getElementById("feeMessageHouse1").textContent = '';
+      }
+    });
+
+    document.getElementById("tradeAmountHouse2").addEventListener("input", function () {
+      const val = parseInt(this.value);
+      if (!isNaN(val) && val > 0) {
+        document.getElementById("feeMessageHouse2").textContent = `Total required = ${val + 10} Watt`;
+        document.getElementById("feeMessageHouse2").className = 'status success';
+      } else {
+        document.getElementById("feeMessageHouse2").textContent = '';
+      }
+    });
+  </script>
+</body>
+</html>
